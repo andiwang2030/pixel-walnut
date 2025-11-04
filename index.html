@@ -7,16 +7,71 @@
     <style>
       html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#1a1a1a; }
       #game-container { width:100%; height:100%; }
+      
       /* 顶部标题条 */
       .hud {
         position:fixed; left:0; right:0; top:0; height:48px; 
         display:flex; align-items:center; gap:12px; padding:0 14px;
         background:#101418; color:#aef; font-family:Arial, Helvetica, sans-serif;
         font-size:14px; z-index:10; border-bottom:1px solid #223;
-        box-shadow: 0 2px 8px rgba(0,0,0,.35);
+        box-shadow: 0 2px 8px rgba(0,0,0,.35)
+
+        <div id="toolbar" style="position:fixed;left:10px;top:56px;z-index:11;background:#0e141b;border:1px solid #2a3a4a;color:#cfe;padding:8px 10px;border-radius:10px;font:13px Arial;display:flex;gap:8px;align-items:center;">
+  <select id="filter-cat">
+    <option value="">全部分类</option>
+    <option value="retail">零售/工作室</option>
+    <option value="cafe">咖啡/餐饮</option>
+    <option value="service">服务</option>
+    <option value="workshop">体验/课程</option>
+  </select>
+  <label style="display:flex;gap:6px;align-items:center;">
+    <input type="checkbox" id="filter-open"/> 营业中
+  </label>
+  <input id="filter-q" placeholder="搜索店名/标签" style="padding:6px 8px;border-radius:8px;border:1px solid #244;background:#0A1218;color:#cfe;"/>
+  <button id="filter-apply">筛选</button>
+</div>
+<div id="merchant-panel" class="panel" style="right:10px;bottom:auto;top:60px;width:720px;display:none;">
+  <div style="display:flex;gap:12px;">
+    <!-- 左侧：商家信息 -->
+    <div style="flex:1;min-width:260px;">
+      <img id="mp-cover" src="" style="width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;border:1px solid #2a3a4a;"/>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <img id="mp-logo" src="" style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3a4a;"/>
+        <div>
+          <h3 id="mp-name" style="margin:0 0 4px 0;"></h3>
+          <div id="mp-tags" style="font-size:12px;color:#9fd;"></div>
+        </div>
+      </div>
+      <div id="mp-blurb" style="margin-top:8px;font-size:13px;color:#cfe;"></div>
+      <div id="mp-hours" style="margin-top:6px;font-size:12px;color:#9ac;"></div>
+      <div id="mp-addr" style="margin-top:6px;font-size:12px;color:#9ac;"></div>
+      <div id="mp-contacts" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" id="btn-review">写评价</button>
+        <button class="btn" id="btn-fav">⭐ 收藏</button>
+        <button class="btn" id="btn-route">🗺️ 路线</button>
+      </div>
+      <div id="mp-reviews" style="margin-top:10px;border-top:1px solid #2a3a4a;padding-top:8px;font-size:12px;color:#cfe;">
+        <b>社区口碑</b>（先做本地存储版本）
+        <div id="mp-reviews-list" style="margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <!-- 右侧：商品网格 -->
+    <div style="flex:1.3;min-width:340px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <b>上架商品 / 体验</b>
+        <button class="btn" id="btn-all-products">查看全部</button>
+      </div>
+      <div id="mp-products" style="margin-top:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;"></div>
+    </div>
+  </div>
+</div>
+
       }
       .hud .badge { background:#243143; color:#cfe; padding:6px 10px; border-radius:10px; }
       .hud a { color:#8fd; text-decoration:none; }
+      
       /* 弹窗 */
       .panel {
         position:fixed; right:10px; bottom:10px; width:280px; 
@@ -64,11 +119,41 @@
     <div class="tip">💡 提示：鼠标拖拽/触摸拖拽移动地图，或用键盘 WASD。</div>
 
     <script>
-     
+     let MERCHANTS = [], PRODUCTS = []; let merchantDots = [];
+
       // ======== 可编辑：你的示例 POI（之后我们会改成从 CSV/数据库加载）========
     let POIS = [];
 
   fetch('poi.json')
+    Promise.all([
+  fetch('merchants.json').then(r=>r.json()),
+  fetch('products.json').then(r=>r.json())
+]).then(([ms, ps])=>{
+  MERCHANTS = ms; PRODUCTS = ps;
+ function placeMerchants(){
+  const scene = app.scene.scenes[0];
+  // 简易样式：用不同颜色代表类别
+  const colorMap = { retail:0xff7f9f, cafe:0x7effb0, service:0x5cc8ff, workshop:0xffde6b };
+  MERCHANTS.forEach(m=>{
+    const color = colorMap[m.cat] || 0xb0a0ff;
+    const g = scene.make.graphics({x:0,y:0,add:false});
+    g.fillStyle(color,1); g.fillCircle(0,0,10); g.lineStyle(2,0x0d0f17,1); g.strokeCircle(0,0,10);
+    const key = `dot_m_${m.id}`;
+    g.generateTexture(key,24,24); g.clear();
+
+    const dot = scene.add.image(m.x, m.y, key).setInteractive({useHandCursor:true}).setDepth(6);
+    dot.on('pointerdown', ()=>{
+      const dist = Phaser.Math.Distance.Between(player.x, player.y, m.x, m.y);
+      if(dist <= INTERACT_DIST*1.5){ openMerchantPanel(m); } else { toast('靠近一点点就能查看店铺内景与商品～'); }
+    });
+
+    const label = scene.add.text(m.x+16, m.y-10, m.name, {fontFamily:'Arial',fontSize:'12px',color:'#e6fff5',stroke:'#0a0f12',strokeThickness:3}).setDepth(10);
+    merchantDots.push({dot,label,merchant:m});
+  });
+}
+; // 渲染地图商家点
+});
+
   .then(res => res.json())
   .then(data => {
     POIS = data;
@@ -318,6 +403,61 @@
       clearTimeout(toastTimer);
       toastTimer = setTimeout(()=>{ el.style.display = "none"; }, 1800);
     }
+      function openMerchantPanel(m){
+  // 左栏
+  document.getElementById('mp-cover').src = m.cover || '';
+  document.getElementById('mp-logo').src = m.logo || '';
+  document.getElementById('mp-name').textContent = m.name;
+  document.getElementById('mp-tags').textContent = (m.tags||[]).join(' · ');
+  document.getElementById('mp-blurb').textContent = m.blurb || '';
+  document.getElementById('mp-hours').textContent = '营业时间：' + (m.hours || '未提供');
+  document.getElementById('mp-addr').textContent = m.address_hint || '';
+  // 联系方式
+  const c = document.getElementById('mp-contacts'); c.innerHTML = '';
+  (m.contacts||[]).forEach(o=>{
+    const a = document.createElement('a'); a.href = o.u; a.target = '_blank'; a.className='btn';
+    a.textContent = ({phone:'☎ 电话', whatsapp:'WhatsApp', instagram:'Instagram', site:'网站', email:'邮件'})[o.t] || '联系';
+    c.appendChild(a);
+  });
+
+  // 右栏：商品
+  const wrap = document.getElementById('mp-products'); wrap.innerHTML='';
+  const list = PRODUCTS.filter(p=>p.merchant_id===m.id).slice(0,6);
+  list.forEach(p=>{
+    const card = document.createElement('div'); card.style.cssText='border:1px solid #2a3a4a;border-radius:10px;overflow:hidden;background:#0b1218;';
+    card.innerHTML = `
+      <img src="${(p.media&&p.media[0])||''}" style="width:100%;height:120px;object-fit:cover;"/>
+      <div style="padding:8px;">
+        <div style="font-size:13px;color:#eaf6ff">${p.title}</div>
+        <div style="font-size:12px;color:#9fd;margin-top:4px;">$${p.price} ${p.currency||''} ${p.bookable?'· 可预约':''}</div>
+        <button class="btn" style="margin-top:8px;width:100%;" onclick="openProduct('${p.id}')">购买 / 预约</button>
+      </div>`;
+    wrap.appendChild(card);
+  });
+
+  document.getElementById('merchant-panel').style.display='block';
+}
+function openProduct(pid){
+  const p = PRODUCTS.find(x=>x.id===pid);
+  if(!p) return;
+  if(p.purchase_url){ window.open(p.purchase_url, '_blank'); }
+}
+document.getElementById('filter-apply').addEventListener('click', applyFilters);
+function applyFilters(){
+  const cat = document.getElementById('filter-cat').value.trim();
+  const q = document.getElementById('filter-q').value.trim().toLowerCase();
+  // “营业中”先忽略，未来接实时营业判断
+  merchantDots.forEach(({dot,label,merchant:m})=>{
+    let show = true;
+    if(cat && m.cat!==cat) show=false;
+    if(q){
+      const hay = (m.name+' '+(m.tags||[]).join(' ')+' '+(m.blurb||'')).toLowerCase();
+      if(!hay.includes(q)) show=false;
+    }
+    dot.visible = label.visible = show;
+  });
+}
+
 
     </script>
   </body>
