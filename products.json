@@ -1,0 +1,41 @@
+[
+  {
+    "id": "p_cm_001",
+    "merchant_id": "m_crystalmart",
+    "title": "入门矿标小套装",
+    "price": 39,
+    "currency": "USD",
+    "media": ["img/prod_cm_001.jpg"],
+    "stock_status": "in_stock",
+    "purchase_url": "https://your-shop.example/products/starter",
+    "bookable": false,
+    "desc": "适合第一次接触矿物的你，附基础科普卡片。",
+    "tags": ["礼物","入门","科普"]
+  },
+  {
+    "id": "p_cm_ws_01",
+    "merchant_id": "m_crystalmart",
+    "title": "打磨体验 · 30 分钟",
+    "price": 15,
+    "currency": "USD",
+    "media": ["img/ws_crystal.jpg"],
+    "stock_status": "limited",
+    "purchase_url": "https://calendly.com/your-id/30min",
+    "bookable": true,
+    "desc": "在工作台体验抛光流程，带走一枚小石。",
+    "tags": ["体验","教学"]
+  },
+  {
+    "id": "p_cafe_001",
+    "merchant_id": "m_snow_coffee",
+    "title": "周六拉花体验",
+    "price": 12,
+    "currency": "USD",
+    "media": ["img/ws_latte.jpg"],
+    "stock_status": "limited",
+    "purchase_url": "https://calendly.com/coffee/latte-art",
+    "bookable": true,
+    "desc": "手把手教你画一颗爱心。",
+    "tags": ["体验","咖啡"]
+  }
+]
