@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Walnut City Hall",
+    "cat": "city_hall",
+    "reward": "+10",
+    "note": "市政服务 · 知识问答",
+    "x": 1800,
+    "y": 1200
+  },
+  {
+    "name": "Walnut Library",
+    "cat": "library",
+    "reward": "+12",
+    "note": "图书馆 · 签到奖励/知识问答",
+    "x": 2100,
+    "y": 1100
+  },
+  {
+    "name": "Snow Creek Park",
+    "cat": "park",
+    "reward": "+8",
+    "note": "公园 · 运动/环保清洁活动",
+    "x": 1600,
+    "y": 1500
+  },
+  {
+    "name": "USPS Post Office",
+    "cat": "post_office",
+    "reward": "+9",
+    "note": "邮局 · 排队助手/投件",
+    "x": 2400,
+    "y": 1300
+  },
+  {
+    "name": "Crystal Mart (Treasure Shop)",
+    "cat": "retail",
+    "reward": "🎁 宝箱",
+    "note": "你的水晶店 · 每日宝箱/消费返币",
+    "x": 1950,
+    "y": 1350
+  }
+]
