@@ -64,14 +64,38 @@
     <div class="tip">💡 提示：鼠标拖拽/触摸拖拽移动地图，或用键盘 WASD。</div>
 
     <script>
+     
       // ======== 可编辑：你的示例 POI（之后我们会改成从 CSV/数据库加载）========
-      const POIS = [
-        { name:"Walnut City Hall", cat:"city_hall", reward:"+10", x: 1800, y: 1200, note:"市政服务 · 可做知识问答/表单任务" },
-        { name:"Walnut Library",   cat:"library",  reward:"+12", x: 2100, y: 1100, note:"图书馆 · 知识问答/安静学习奖励" },
-        { name:"Snow Creek Park",  cat:"park",     reward:"+8",  x: 1600, y: 1500, note:"公园 · 运动/拍照点/环保清洁活动" },
-        { name:"USPS Post Office", cat:"post_office", reward:"+9", x: 2400, y: 1300, note:"邮局 · 排队助手/文档投递" },
-        { name:"Crystal Mart (Treasure Shop)", cat:"retail", reward:"🎁 宝箱", x: 1950, y: 1350, note:"你的水晶店 · 每日宝箱/消费返币" }
-      ];
+    let POIS = [];
+
+fetch('poi.json')
+  .then(res => res.json())
+  .then(data => {
+    POIS = data;
+    // 当 JSON 加载完成后再放置 POI
+    placePOIs();
+  });
+
+function placePOIs() {
+  POIS.forEach(p => {
+    const key = {
+      city_hall:"dot_cityhall",
+      library:"dot_library",
+      park:"dot_park",
+      post_office:"dot_post",
+      retail:"dot_retail"
+    }[p.cat] || "dot_retail";
+
+    const dot = app.scene.scenes[0].add.image(p.x, p.y, key).setInteractive({useHandCursor:true});
+    dot.on("pointerdown", ()=> openPanel(p));
+
+    app.scene.scenes[0].add.text(p.x+16, p.y-10, p.name, {
+      fontFamily:"Arial", fontSize:"12px", color:"#e6fff5",
+      stroke:"#0a0f12", strokeThickness:3
+    }).setDepth(10);
+  });
+}
+
 
       // ======== Phaser 基础配置 ========
       const WorldWidth = 3200;   // 世界宽
