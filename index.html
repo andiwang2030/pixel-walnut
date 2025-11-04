@@ -191,7 +191,7 @@
         player = this.physics.add.image(1856, 1280, "hero")
 
           .setDepth(5)
-          .setCollideWorldBounds(true);
+          .setCollideWorldBounds(false);
         
         // 相机跟随主角
         camera.startFollow(player, true, 0.1, 0.1);
