@@ -166,6 +166,7 @@
       function create(){
         camera = this.cameras.main;
         camera.setBounds(0,0, WorldWidth, WorldHeight);
+        this.physics.world.setBounds(0, 0, WorldWidth, WorldHeight);
         camera.setZoom(1);
 
         // 背景草地拼贴
@@ -191,7 +192,7 @@
         player = this.physics.add.image(1856, 1280, "hero")
 
           .setDepth(5)
-          .setCollideWorldBounds(false);
+          .setCollideWorldBounds(true);
         
         // 相机跟随主角
         camera.startFollow(player, true, 0.1, 0.1);
