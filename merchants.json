@@ -1,0 +1,47 @@
+[
+  {
+    "id": "m_crystalmart",
+    "name": "Crystal Mart · 开放工作台",
+    "cat": "retail",
+    "x": 1950,
+    "y": 1350,
+    "logo": "img/crystal_logo.png",
+    "cover": "img/crystal_cover.jpg",
+    "blurb": "矿物雕刻·展陈·入门矿标，开放参观与体验。",
+    "address_hint": "Calle Vista 附近（道路级）",
+    "hours": "Mon-Sun 10:00–19:00",
+    "services": ["in_store","pickup","workshop"],
+    "contacts": [
+      {"t":"phone","u":"tel:+1-626-000-0000"},
+      {"t":"whatsapp","u":"https://wa.me/16260000000"},
+      {"t":"site","u":"https://your-site.example"}
+    ],
+    "rating": 4.9,
+    "reviews_count": 36,
+    "tags": ["矿物","手作","本地工作室"],
+    "verified": true,
+    "highlights": ["可预约小课","可定制小件","讲解矿物故事"]
+  },
+  {
+    "id": "m_snow_coffee",
+    "name": "Snow Creek Coffee",
+    "cat": "cafe",
+    "x": 1600,
+    "y": 1480,
+    "logo": "img/cafe_logo.png",
+    "cover": "img/cafe_cover.jpg",
+    "blurb": "自烘精品，周六拉花体验。",
+    "address_hint": "Snow Creek 公园侧",
+    "hours": "Daily 07:30–18:30",
+    "services": ["in_store","pickup"],
+    "contacts": [
+      {"t":"phone","u":"tel:+1-626-111-1111"},
+      {"t":"instagram","u":"https://instagram.com/coffee_demo"}
+    ],
+    "rating": 4.7,
+    "reviews_count": 128,
+    "tags": ["咖啡","甜点","体验课"],
+    "verified": false,
+    "highlights": ["手冲吧台","本地豆"]
+  }
+]
