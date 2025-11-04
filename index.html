@@ -1,15 +1,459 @@
-document.getElementById('filter-apply').addEventListener('click', applyFilters);
-function applyFilters(){
-  const cat = document.getElementById('filter-cat').value.trim();
-  const q = document.getElementById('filter-q').value.trim().toLowerCase();
-  // “营业中”先忽略，未来接实时营业判断
-  merchantDots.forEach(({dot,label,merchant:m})=>{
-    let show = true;
-    if(cat && m.cat!==cat) show=false;
-    if(q){
-      const hay = (m.name+' '+(m.tags||[]).join(' ')+' '+(m.blurb||'')).toLowerCase();
-      if(!hay.includes(q)) show=false;
-    }
-    dot.visible = label.visible = show;
-  });
-}
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>City OS · 商业地图 MVP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+    <style>
+      html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#1a1a1a; }
+      #game-container { width:100%; height:100%; }
+      .hud {
+        position:fixed; left:0; right:0; top:0; height:48px;
+        display:flex; align-items:center; gap:12px; padding:0 14px;
+        background:#101418; color:#aef; font-family:Arial, Helvetica, sans-serif;
+        font-size:14px; z-index:20; border-bottom:1px solid #223;
+        box-shadow: 0 2px 8px rgba(0,0,0,.35);
+      }
+      .hud .badge { background:#243143; color:#cfe; padding:6px 10px; border-radius:10px; }
+      .hud a { color:#8fd; text-decoration:none; }
+      .panel {
+        position:fixed; right:10px; bottom:auto; top:60px; width:720px;
+        background:#0e141b; color:#eaf6ff; border:1px solid #2a3a4a;
+        border-radius:10px; padding:14px; z-index:15; display:none;
+        font-family:Arial, Helvetica, sans-serif;
+        box-shadow: 0 12px 28px rgba(0,0,0,.5);
+      }
+      .btn {
+        display:inline-block; font-size:13px; padding:8px 10px; background:#174;
+        color:#dff; border-radius:8px; cursor:pointer; border:0;
+      }
+      .btn:hover { filter:brightness(1.1);}
+      .tag { display:inline-block; font-size:12px; padding:2px 6px; border-radius:8px; background:#17324a; color:#bfe; margin-right:6px;}
+      .tip {
+        position:fixed; left:50%; transform:translateX(-50%); bottom:12px;
+        background:#0d1720; color:#aee; padding:8px 12px; border-radius:10px;
+        border:1px solid #203040; font-family:Arial; font-size:12px; z-index:9;
+        box-shadow: 0 6px 18px rgba(0,0,0,.35);
+      }
+      /* 顶部筛选条 */
+      #toolbar {
+        position:fixed; left:10px; top:56px; z-index:14; background:#0e141b;
+        border:1px solid #2a3a4a; color:#cfe; padding:8px 10px; border-radius:10px;
+        font:13px Arial; display:flex; gap:8px; align-items:center;
+      }
+      #toolbar input, #toolbar select, #toolbar button {
+        background:#0A1218; color:#cfe; border:1px solid #244; border-radius:8px; padding:6px 8px;
+      }
+      #toolbar button { background:#17324a; cursor:pointer; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.0/dist/phaser.min.js"></script>
+  </head>
+  <body>
+    <!-- 顶部栏 -->
+    <div class="hud" id="topbar">
+      <div class="badge">🏙️ City OS · 商业地图 MVP</div>
+      <div class="badge">拖拽/滚轮缩放 · WASD/方向键移动 · 靠近商家点击查看</div>
+      <div style="flex:1"></div>
+      <a href="#" id="closeAll">关闭面板</a>
+    </div>
+
+    <!-- 筛选工具条 -->
+    <div id="toolbar">
+      <select id="filter-cat" title="分类">
+        <option value="">全部分类</option>
+        <option value="retail">零售/工作室</option>
+        <option value="cafe">咖啡/餐饮</option>
+        <option value="service">服务</option>
+        <option value="workshop">体验/课程</option>
+      </select>
+      <input id="filter-q" placeholder="搜索店名/标签/简介" title="关键词"/>
+      <button id="filter-apply">筛选</button>
+      <button id="filter-reset">重置</button>
+    </div>
+
+    <!-- 游戏画布 -->
+    <div id="game-container"></div>
+
+    <!-- 商家侧边面板（左信息 + 右商品） -->
+    <div id="merchant-panel" class="panel">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <!-- 左侧信息 -->
+        <div style="flex:1;min-width:260px;">
+          <img id="mp-cover" src="" style="width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;border:1px solid #2a3a4a;"/>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <div style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3a4a;overflow:hidden;background:#091218;">
+              <img id="mp-logo" src="" style="width:44px;height:44px;object-fit:cover;"/>
+            </div>
+            <div>
+              <h3 id="mp-name" style="margin:0 0 4px 0;"></h3>
+              <div id="mp-tags" style="font-size:12px;color:#9fd;"></div>
+            </div>
+          </div>
+          <div id="mp-blurb" style="margin-top:8px;font-size:13px;color:#cfe;"></div>
+          <div id="mp-hours" style="margin-top:6px;font-size:12px;color:#9ac;"></div>
+          <div id="mp-addr" style="margin-top:6px;font-size:12px;color:#9ac;"></div>
+          <div id="mp-contacts" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn" id="btn-fav">⭐ 收藏</button>
+            <button class="btn" id="btn-route">🗺️ 路线</button>
+          </div>
+        </div>
+        <!-- 右侧商品 -->
+        <div style="flex:1.3;min-width:340px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <b>上架商品 / 体验</b>
+            <button class="btn" id="btn-all-products">查看全部</button>
+          </div>
+          <div id="mp-products" style="margin-top:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提示 -->
+    <div class="tip" id="toast" style="display:none;"></div>
+
+    <script>
+      // -------------------------
+      // 运行参数（世界大小、交互距离）
+      // -------------------------
+      const WorldWidth = 3200;
+      const WorldHeight = 2200;
+      const INTERACT_DIST = 160;
+
+      // -------------------------
+      // 数据：示例商家 & 商品（自包含，不用外部 JSON）
+      // 替换这里即可更新数据
+      // -------------------------
+      const MERCHANTS = [
+        {
+          id: "m_crystalmart",
+          name: "Crystal Mart · 开放工作台",
+          cat: "retail",
+          x: 1950, y: 1350,
+          logo: "", // 可放你的店标URL
+          cover: "", // 可放你的店内照URL
+          blurb: "矿物雕刻·展陈·入门矿标，开放参观与体验。",
+          address_hint: "Calle Vista 附近（道路级）",
+          hours: "Mon–Sun 10:00–19:00",
+          services: ["in_store","pickup","workshop"],
+          contacts: [
+            {t:"phone",u:"tel:+1-626-000-0000"},
+            {t:"site",u:"https://example.com"}
+          ],
+          rating: 4.9, reviews_count: 36,
+          tags: ["矿物","手作","本地工作室"],
+          verified: true,
+          highlights: ["可预约小课","可定制小件","讲解矿物故事"]
+        },
+        {
+          id: "m_snow_coffee",
+          name: "Snow Creek Coffee",
+          cat: "cafe",
+          x: 1600, y: 1480,
+          logo: "",
+          cover: "",
+          blurb: "自烘精品，周六拉花体验。",
+          address_hint: "Snow Creek 公园侧",
+          hours: "Daily 07:30–18:30",
+          services: ["in_store","pickup"],
+          contacts: [
+            {t:"phone",u:"tel:+1-626-111-1111"},
+            {t:"instagram",u:"https://instagram.com/coffee_demo"}
+          ],
+          rating: 4.7, reviews_count: 128,
+          tags: ["咖啡","甜点","体验课"],
+          verified: false,
+          highlights: ["手冲吧台","本地豆"]
+        }
+      ];
+
+      const PRODUCTS = [
+        {
+          id:"p_cm_001", merchant_id:"m_crystalmart",
+          title:"入门矿标小套装", price:39, currency:"USD",
+          media:[""], stock_status:"in_stock",
+          purchase_url:"https://example.com/products/starter",
+          bookable:false, desc:"适合第一次接触矿物的你，附基础科普卡片。",
+          tags:["礼物","入门","科普"]
+        },
+        {
+          id:"p_cm_ws_01", merchant_id:"m_crystalmart",
+          title:"打磨体验 · 30 分钟", price:15, currency:"USD",
+          media:[""], stock_status:"limited",
+          purchase_url:"https://calendly.com/your-id/30min",
+          bookable:true, desc:"在工作台体验抛光流程，带走一枚小石。",
+          tags:["体验","教学"]
+        },
+        {
+          id:"p_cafe_001", merchant_id:"m_snow_coffee",
+          title:"周六拉花体验", price:12, currency:"USD",
+          media:[""], stock_status:"limited",
+          purchase_url:"https://calendly.com/coffee/latte-art",
+          bookable:true, desc:"手把手教你画一颗爱心。",
+          tags:["体验","咖啡"]
+        }
+      ];
+
+      // -------------------------
+      // Phaser 初始化
+      // -------------------------
+      const app = new Phaser.Game({
+        type: Phaser.AUTO,
+        parent: "game-container",
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelArt: true,
+        backgroundColor: "#183024",
+        scene: { preload, create, update },
+        physics: { default: "arcade" }
+      });
+
+      let camera, player, keys, dragging=false, dragX=0, dragY=0;
+      let merchantDots = [];
+
+      function preload(){
+        // 草地
+        const g = this.make.graphics({x:0,y:0, add:false});
+        g.fillStyle(0x245c3c,1); g.fillRect(0,0,64,64);
+        g.lineStyle(2, 0x2d7a50, 1); g.strokeRect(1,1,62,62);
+        g.generateTexture("tile_grass",64,64); g.clear();
+
+        // 道路
+        g.fillStyle(0xc6a15b,1); g.fillRect(0,0,64,64);
+        g.lineStyle(2,0xa58445,1); g.strokeRect(1,1,62,62);
+        g.generateTexture("tile_road",64,64); g.clear();
+
+        // 商家点颜色
+        makeDot(this, "dot_retail",   0xff7f9f);
+        makeDot(this, "dot_cafe",     0x7effb0);
+        makeDot(this, "dot_service",  0x5cc8ff);
+        makeDot(this, "dot_workshop", 0xffde6b);
+
+        // 主角
+        const pg = this.make.graphics({x:0,y:0, add:false});
+        pg.fillStyle(0x4bd3a0, 1); pg.fillRect(0,0,24,24);
+        pg.fillStyle(0x083c2c,1); pg.fillCircle(7,9,2); pg.fillCircle(17,9,2);
+        pg.fillRect(6,16,12,3); pg.generateTexture("hero",24,24); pg.clear();
+      }
+
+      function makeDot(scene, key, color){
+        const g = scene.make.graphics({x:0,y:0, add:false});
+        g.fillStyle(color,1); g.fillCircle(12,12,12);
+        g.lineStyle(2,0x0d0f17,1); g.strokeCircle(12,12,12);
+        g.generateTexture(key,24,24); g.clear();
+      }
+
+      function create(){
+        camera = this.cameras.main;
+        camera.setBounds(0,0, WorldWidth, WorldHeight);
+        camera.setZoom(1);
+        this.physics.world.setBounds(0,0, WorldWidth, WorldHeight);
+
+        // 背景草地
+        const cols = Math.ceil(WorldWidth/64);
+        const rows = Math.ceil(WorldHeight/64);
+        for(let i=0;i<cols;i++){
+          for(let j=0;j<rows;j++){
+            this.add.image(i*64+32, j*64+32, "tile_grass").setDepth(0);
+          }
+        }
+        // 简单道路网
+        for(let x=0;x<WorldWidth; x+=64){
+          this.add.image(x+32, 1280, "tile_road").setDepth(1);
+          this.add.image(x+32, 1408, "tile_road").setDepth(1);
+        }
+        for(let y=0;y<WorldHeight; y+=64){
+          this.add.image(1856, y+32, "tile_road").setDepth(1);
+          this.add.image(1984, y+32, "tile_road").setDepth(1);
+        }
+
+        // 主角
+        player = this.physics.add.image(1900, 1320, "hero")
+          .setDepth(5).setCollideWorldBounds(true);
+        camera.startFollow(player, true, 0.1, 0.1);
+
+        // 键盘
+        keys = this.input.keyboard.addKeys({
+          up:"W", left:"A", down:"S", right:"D",
+          up2:"UP", left2:"LEFT", down2:"DOWN", right2:"RIGHT",
+          interact:"SPACE", esc:"ESC"
+        });
+
+        // 拖拽相机
+        this.input.on("pointerdown", (p)=>{ dragging=true; dragX=p.x; dragY=p.y; });
+        this.input.on("pointerup", ()=> dragging=false);
+        this.input.on("pointermove", (p)=>{
+          if(!dragging) return;
+          const dx=p.x-dragX, dy=p.y-dragY;
+          camera.scrollX -= dx/camera.zoom; camera.scrollY -= dy/camera.zoom;
+          dragX=p.x; dragY=p.y;
+        });
+        // 缩放
+        this.input.on("wheel", (p, go, dx, dy)=>{
+          const z = Phaser.Math.Clamp(camera.zoom - dy*0.001, 0.5, 2.5);
+          camera.setZoom(z);
+        });
+
+        // 窗口自适应
+        window.addEventListener("resize", ()=>{
+          app.scale.resize(window.innerWidth, window.innerHeight);
+        });
+
+        // 放置商家
+        placeMerchants();
+
+        // 顶部栏关闭
+        document.getElementById("topbar").addEventListener("click", ()=>{
+          document.getElementById("merchant-panel").style.display="none";
+        });
+        document.getElementById("closeAll").addEventListener("click", (e)=>{
+          e.preventDefault();
+          document.getElementById("merchant-panel").style.display="none";
+        });
+
+        // 筛选事件
+        document.getElementById("filter-apply").addEventListener("click", applyFilters);
+        document.getElementById("filter-reset").addEventListener("click", ()=>{
+          document.getElementById("filter-cat").value="";
+          document.getElementById("filter-q").value="";
+          applyFilters();
+        });
+      }
+
+      function update(){
+        const speed = 180;
+        let vx=0, vy=0;
+        if(keys.left.isDown || keys.left2.isDown)  vx=-speed;
+        if(keys.right.isDown|| keys.right2.isDown) vx=speed;
+        if(keys.up.isDown   || keys.up2.isDown)    vy=-speed;
+        if(keys.down.isDown || keys.down2.isDown)  vy=speed;
+        if(vx!==0 && vy!==0){ vx*=Math.SQRT1_2; vy*=Math.SQRT1_2; }
+        player.setVelocity(vx,vy);
+
+        if(Phaser.Input.Keyboard.JustDown(keys.esc)){
+          document.getElementById("merchant-panel").style.display="none";
+        }
+        if(Phaser.Input.Keyboard.JustDown(keys.interact)){
+          const m = nearestMerchant(player.x, player.y, INTERACT_DIST);
+          if(m){ openMerchantPanel(m); } else { toast("靠近一个商家再按空格查看内景与商品"); }
+        }
+      }
+
+      // -------------------------
+      // 商家点渲染 & 面板
+      // -------------------------
+      function placeMerchants(){
+        const scene = app.scene.scenes[0];
+        const keyByCat = { retail:"dot_retail", cafe:"dot_cafe", service:"dot_service", workshop:"dot_workshop" };
+        MERCHANTS.forEach(m=>{
+          const key = keyByCat[m.cat] || "dot_service";
+          const dot = scene.add.image(m.x, m.y, key).setInteractive({useHandCursor:true}).setDepth(6);
+          dot.on("pointerdown", ()=>{
+            const dist = Phaser.Math.Distance.Between(player.x, player.y, m.x, m.y);
+            if(dist <= INTERACT_DIST*1.5){ openMerchantPanel(m); } else { toast("再靠近一点点就能查看店铺内景与商品～"); }
+          });
+          const label = scene.add.text(m.x+16, m.y-10, m.name, {
+            fontFamily:"Arial", fontSize:"12px", color:"#e6fff5", stroke:"#0a0f12", strokeThickness:3
+          }).setDepth(10);
+          merchantDots.push({dot,label,merchant:m});
+        });
+      }
+
+      function nearestMerchant(x,y,maxd){
+        let best=null, bd=Infinity;
+        merchantDots.forEach(({merchant:m})=>{
+          const d = Phaser.Math.Distance.Between(x,y,m.x,m.y);
+          if(d<bd && d<=maxd){ best=m; bd=d; }
+        });
+        return best;
+      }
+
+      function openMerchantPanel(m){
+        // 左侧信息
+        document.getElementById('mp-cover').src = m.cover || '';
+        document.getElementById('mp-logo').src  = m.logo  || '';
+        document.getElementById('mp-name').textContent = m.name || '';
+        document.getElementById('mp-tags').textContent = (m.tags||[]).join(' · ');
+        document.getElementById('mp-blurb').textContent = m.blurb || '';
+        document.getElementById('mp-hours').textContent = '营业时间：' + (m.hours || '未提供');
+        document.getElementById('mp-addr').textContent  = m.address_hint || '';
+
+        // 联系方式按钮
+        const c = document.getElementById('mp-contacts'); c.innerHTML='';
+        (m.contacts||[]).forEach(o=>{
+          const a = document.createElement('a'); a.href=o.u; a.target='_blank'; a.className='btn';
+          a.textContent = ({phone:'☎ 电话', whatsapp:'WhatsApp', instagram:'Instagram', site:'网站', email:'邮件'})[o.t] || '联系';
+          c.appendChild(a);
+        });
+
+        // 右侧商品
+        const wrap = document.getElementById('mp-products'); wrap.innerHTML='';
+        const list = PRODUCTS.filter(p=>p.merchant_id===m.id).slice(0,6);
+        if(list.length===0){
+          const empty = document.createElement('div');
+          empty.style.cssText='margin:8px 0;color:#9ac;font-size:13px;';
+          empty.textContent = '商家尚未上架商品/体验';
+          wrap.appendChild(empty);
+        } else {
+          list.forEach(p=>{
+            const card=document.createElement('div');
+            card.style.cssText='border:1px solid #2a3a4a;border-radius:10px;overflow:hidden;background:#0b1218;';
+            card.innerHTML = `
+              <div style="width:100%;height:120px;background:#0a1218;display:flex;align-items:center;justify-content:center;">
+                ${p.media && p.media[0] ? `<img src="${p.media[0]}" style="width:100%;height:120px;object-fit:cover;"/>` : `<div style="color:#567;font-size:12px;">无图</div>`}
+              </div>
+              <div style="padding:8px;">
+                <div style="font-size:13px;color:#eaf6ff">${p.title}</div>
+                <div style="font-size:12px;color:#9fd;margin-top:4px;">$${p.price} ${p.currency||''} ${p.bookable?'· 可预约':''}</div>
+                <button class="btn" style="margin-top:8px;width:100%;" onclick="openProduct('${p.id}')">购买 / 预约</button>
+              </div>`;
+            wrap.appendChild(card);
+          });
+        }
+
+        // 其它按钮（占位）
+        document.getElementById('btn-fav').onclick = ()=>{ toast('已收藏（本地演示）'); };
+        document.getElementById('btn-route').onclick = ()=>{ toast('路线功能即将上线'); };
+        document.getElementById('btn-all-products').onclick = ()=>{ toast('查看全部（演示）'); };
+
+        document.getElementById('merchant-panel').style.display='block';
+      }
+
+      function openProduct(pid){
+        const p = PRODUCTS.find(x=>x.id===pid);
+        if(!p) return;
+        if(p.purchase_url){ window.open(p.purchase_url, '_blank'); }
+        else { toast('暂无购买/预约链接'); }
+      }
+
+      // -------------------------
+      // 筛选
+      // -------------------------
+      function applyFilters(){
+        const cat = document.getElementById('filter-cat').value.trim();
+        const q   = document.getElementById('filter-q').value.trim().toLowerCase();
+        merchantDots.forEach(({dot,label,merchant:m})=>{
+          let show=true;
+          if(cat && m.cat!==cat) show=false;
+          if(q){
+            const hay = (m.name+' '+(m.tags||[]).join(' ')+' '+(m.blurb||'')).toLowerCase();
+            if(!hay.includes(q)) show=false;
+          }
+          dot.visible = label.visible = show;
+        });
+      }
+
+      // -------------------------
+      // 提示小气泡
+      // -------------------------
+      let toastTimer=null;
+      function toast(msg){
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.style.display='block';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(()=>{ el.style.display='none'; }, 1800);
+      }
+    </script>
+  </body>
+</html>
